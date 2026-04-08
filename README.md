@@ -155,6 +155,20 @@ The consent endpoint is available at `POST /onboarding/consent/check` and accept
 
 It returns tenant/app identity claims plus missing Graph scopes/roles to help validate admin consent during onboarding.
 
+Quick demo flow:
+
+```powershell
+python scripts/consent_check_server.py
+```
+
+In a second terminal:
+
+```powershell
+python scripts/test_consent_check.py
+```
+
+The test script acquires a Graph token via Azure CLI and posts it to the consent endpoint automatically.
+
 ## Important limitations in this starter
 
 - OneDrive ingestion reads text-like files directly and stores metadata for unsupported binary files.
