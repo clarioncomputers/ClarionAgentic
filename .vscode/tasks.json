@@ -52,6 +52,15 @@
       "problemMatcher": []
     },
     {
+      "label": "Test consent check with token",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "scripts\\test_consent_check_with_token.py"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Run Clarion Hosted Agent",
       "type": "shell",
       "command": ".\\.venv\\Scripts\\python.exe",

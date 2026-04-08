@@ -169,6 +169,20 @@ python scripts/test_consent_check.py
 
 The test script acquires a Graph token via Azure CLI and posts it to the consent endpoint automatically.
 
+Customer-tenant token flow:
+
+```powershell
+python scripts/test_consent_check_with_token.py --token "<tenant-access-token>"
+```
+
+Or with a captured callback URL:
+
+```powershell
+python scripts/test_consent_check_with_token.py --callback-url "https://yourapp/callback#access_token=..."
+```
+
+If no token argument is provided, the script reads `CUSTOMER_ACCESS_TOKEN` from environment variables.
+
 ## Important limitations in this starter
 
 - OneDrive ingestion reads text-like files directly and stores metadata for unsupported binary files.
