@@ -87,6 +87,16 @@
       ],
       "problemMatcher": [],
       "isBackground": true
+    },
+    {
+      "label": "Run Clarion Web Chat",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "scripts\\web_chat_app.py"
+      ],
+      "problemMatcher": [],
+      "isBackground": true
     }
   ]
 }

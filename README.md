@@ -86,6 +86,22 @@ $body = @{
 Invoke-RestMethod -Uri http://localhost:8088/responses -Method Post -Body $body -ContentType "application/json"
 ```
 
+## Web chat UI (browser)
+
+If you prefer a browser chat interface, run:
+
+```powershell
+python scripts/web_chat_app.py
+```
+
+Then open:
+
+- `http://127.0.0.1:8090`
+
+The UI forwards prompts to the hosted agent endpoint (`http://127.0.0.1:8088/responses`) and shows responses in a chat view.
+
+You can also start it from VS Code tasks with `Run Clarion Web Chat`.
+
 ## Deploy to Foundry
 
 This scaffold includes the files Foundry workflows typically need:
