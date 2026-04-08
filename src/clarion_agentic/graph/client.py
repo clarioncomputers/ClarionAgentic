@@ -167,7 +167,9 @@ class GraphClient:
         for item in data.get("value", []):
             html_body = item.get("body", {}).get("content", "")
             clean_body = TAG_PATTERN.sub(" ", html_body)
-            author = item.get("from", {}).get("user", {}).get("displayName", "Unknown")
+            from_obj = item.get("from") or {}
+            user_obj = from_obj.get("user") or {}
+            author = user_obj.get("displayName", "Unknown")
             documents.append(
                 CorpusDocument(
                     doc_id=f"teams-message:{item['id']}",

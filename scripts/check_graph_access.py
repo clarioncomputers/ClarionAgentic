@@ -56,9 +56,19 @@ async def main() -> None:
     load_dotenv(override=False)
 
     user_id = os.getenv("M365_USER_ID", "").strip()
+    app_client_id = os.getenv("AZURE_CLIENT_ID", "").strip()
+    app_client_secret = os.getenv("AZURE_CLIENT_SECRET", "").strip()
+    is_app_auth = bool(app_client_id and app_client_secret)
     teams_channels = json.loads(os.getenv("M365_TEAMS_CHANNELS", "[]"))
 
-    checks: list[tuple[str, str]] = [("profile", "/me?$select=id,userPrincipalName")]
+    checks: list[tuple[str, str]] = []
+    if is_app_auth:
+        if user_id:
+            checks.append(("profile", f"/users/{user_id}?$select=id,userPrincipalName"))
+        else:
+            checks.append(("profile", "/users?$top=1&$select=id,userPrincipalName"))
+    else:
+        checks.append(("profile", "/me?$select=id,userPrincipalName"))
     if user_id:
         checks.append(("outlook-mail", f"/users/{user_id}/messages?$top=1"))
         checks.append(("outlook-calendar", f"/users/{user_id}/events?$top=1"))
