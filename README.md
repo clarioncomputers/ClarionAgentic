@@ -53,6 +53,14 @@ Fill in `.env` with your Foundry project endpoint, model deployment, and Microso
 
 ## Ingest Microsoft 365 data
 
+Before ingesting, validate Graph access:
+
+```powershell
+python scripts/check_graph_access.py
+```
+
+Then ingest:
+
 ```powershell
 python scripts/ingest_m365.py
 ```
