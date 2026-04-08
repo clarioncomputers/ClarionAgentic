@@ -183,6 +183,14 @@ python scripts/test_consent_check_with_token.py --callback-url "https://yourapp/
 
 If no token argument is provided, the script reads `CUSTOMER_ACCESS_TOKEN` from environment variables.
 
+Automatic callback capture flow:
+
+```powershell
+python scripts/capture_consent_callback.py
+```
+
+This starts a local callback listener (default `http://127.0.0.1:8787/callback`) and automatically submits the captured token to the local consent-check endpoint.
+
 ## Important limitations in this starter
 
 - OneDrive ingestion reads text-like files directly and stores metadata for unsupported binary files.

@@ -61,6 +61,15 @@
       "problemMatcher": []
     },
     {
+      "label": "Capture callback and test consent",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "scripts\\capture_consent_callback.py"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Run Clarion Hosted Agent",
       "type": "shell",
       "command": ".\\.venv\\Scripts\\python.exe",
