@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install Python dependencies",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "pip",
+        "install",
+        "-r",
+        "requirements.txt"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Ingest Microsoft 365 corpus",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "scripts\\ingest_m365.py"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Clarion Hosted Agent",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "main.py"
+      ],
+      "problemMatcher": [],
+      "isBackground": true
+    }
+  ]
+}

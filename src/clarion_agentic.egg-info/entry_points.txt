@@ -1,0 +1,2 @@
+[console_scripts]
+clarion-agent = clarion_agentic.main:run

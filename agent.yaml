@@ -1,0 +1,17 @@
+name: clarion-m365-rag
+description: Hosted Microsoft Agent Framework agent for Microsoft 365 RAG across Teams, OneDrive, and Outlook.
+template:
+  kind: hosted
+  protocols:
+    responses:
+      version: v1
+  environment_variables:
+    FOUNDRY_PROJECT_ENDPOINT: ${FOUNDRY_PROJECT_ENDPOINT}
+    FOUNDRY_MODEL_DEPLOYMENT_NAME: ${FOUNDRY_MODEL_DEPLOYMENT_NAME}
+    AGENT_NAME: ${AGENT_NAME}
+    LOG_LEVEL: ${LOG_LEVEL}
+    M365_USER_ID: ${M365_USER_ID}
+    M365_DRIVE_ID: ${M365_DRIVE_ID}
+    M365_DRIVE_PATH: ${M365_DRIVE_PATH}
+    M365_TEAMS_CHANNELS: ${M365_TEAMS_CHANNELS}
+    M365_MAX_ITEMS: ${M365_MAX_ITEMS}

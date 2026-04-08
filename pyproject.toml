@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clarion-agentic"
+version = "0.1.0"
+description = "Microsoft Foundry hosted agent for Microsoft 365 RAG"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "agent-framework-core==1.0.0rc3",
+  "agent-framework-azure-ai==1.0.0rc3",
+  "azure-ai-agentserver-agentframework==1.0.0b16",
+  "azure-ai-agentserver-core==1.0.0b16",
+  "azure-identity>=1.19.0",
+  "httpx>=0.27.2",
+  "python-dotenv>=1.0.1",
+]
+
+[project.scripts]
+clarion-agent = "clarion_agentic.main:run"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

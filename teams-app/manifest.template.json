@@ -1,0 +1,68 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.20/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.20",
+  "version": "1.0.0",
+  "id": "${TEAMS_APP_ID}",
+  "packageName": "com.contoso.clarionagentic",
+  "developer": {
+    "name": "Contoso",
+    "websiteUrl": "https://contoso.example.com",
+    "privacyUrl": "https://contoso.example.com/privacy",
+    "termsOfUseUrl": "https://contoso.example.com/terms"
+  },
+  "name": {
+    "short": "Clarion Agentic",
+    "full": "Clarion Agentic for Microsoft 365"
+  },
+  "description": {
+    "short": "Foundry agent for Teams, OneDrive, and Outlook knowledge.",
+    "full": "Clarion Agentic is a Microsoft Foundry hosted agent that answers against Microsoft 365 content ingested from Teams, OneDrive, and Outlook."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#115ea3",
+  "bots": [
+    {
+      "botId": "${BOT_APP_ID}",
+      "scopes": [
+        "personal",
+        "team",
+        "groupChat"
+      ],
+      "supportsFiles": true,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": [
+            "personal",
+            "team",
+            "groupChat"
+          ],
+          "commands": [
+            {
+              "title": "refresh-corpus",
+              "description": "Refresh the Microsoft 365 knowledge corpus."
+            },
+            {
+              "title": "query-m365",
+              "description": "Ask a question over Teams, OneDrive, and Outlook content."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "${AGENT_HOST_DOMAIN}"
+  ],
+  "webApplicationInfo": {
+    "id": "${BOT_APP_ID}",
+    "resource": "api://${AGENT_HOST_DOMAIN}/${BOT_APP_ID}"
+  }
+}

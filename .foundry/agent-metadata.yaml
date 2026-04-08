@@ -1,0 +1,12 @@
+defaultEnvironment: dev
+environments:
+  dev:
+    projectEndpoint: https://clarion2049-resource.services.ai.azure.com/api/projects/clarionagentic-dev
+    agentName: clarion-m365-rag
+    azureContainerRegistry: <registry-name>.azurecr.io
+    testCases: []
+  prod:
+    projectEndpoint: https://clarion2049-resource.services.ai.azure.com/api/projects/clarionagentic-prod
+    agentName: clarion-m365-rag
+    azureContainerRegistry: <registry-name>.azurecr.io
+    testCases: []
