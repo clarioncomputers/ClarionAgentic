@@ -92,6 +92,34 @@ You still need to:
 2. Set the environment variables in your hosted agent deployment.
 3. Register the Teams app and map the deployed hostname into the manifest template.
 
+## Current Azure Setup
+
+The current live Azure configuration for this repo is:
+
+- Foundry resource: `clarion2049-resource`
+- Resource group: `rg-az305`
+- Region: `uksouth`
+- Dev project: `clarionagentic-dev`
+- Dev project endpoint: `https://clarion2049-resource.services.ai.azure.com/api/projects/clarionagentic-dev`
+- Current model deployment verified on the resource: `gpt-4o`
+
+Applied governance tags:
+
+- Foundry account: `app=clarion`, `env=shared`, `owner=barrywatson`, `costCenter=agentics`
+- Foundry project: `app=clarion`, `env=dev`, `owner=barrywatson`, `costCenter=agentics`
+
+## Related Azure Hardening
+
+During setup, the existing Signalweave Function App in `rg-dev` was checked for overlap risk and hardened for secret handling:
+
+- Function App: `teams-sentiment-func`
+- Key Vault created/reused: `kvsignalweavedev2049`
+- `AI_LANGUAGE_KEY` was moved from plain app settings storage to a Key Vault reference
+
+Recommended next security step:
+
+- Rotate the underlying AI Language service key and update the Key Vault secret value after rotation
+
 ## Teams / Microsoft 365 integration notes
 
 The `teams-app/manifest.template.json` file is intentionally a template. You must replace placeholders for:
