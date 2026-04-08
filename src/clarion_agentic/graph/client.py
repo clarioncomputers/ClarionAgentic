@@ -46,11 +46,26 @@ class GraphClient:
 
     async def fetch_all_documents(self) -> list[CorpusDocument]:
         documents: list[CorpusDocument] = []
-        documents.extend(await self.fetch_outlook_messages())
-        documents.extend(await self.fetch_outlook_events())
-        documents.extend(await self.fetch_onedrive_documents())
-        documents.extend(await self.fetch_teams_messages())
+        documents.extend(await self._safe_fetch("outlook-mail", self.fetch_outlook_messages))
+        documents.extend(await self._safe_fetch("outlook-calendar", self.fetch_outlook_events))
+        documents.extend(await self._safe_fetch("onedrive", self.fetch_onedrive_documents))
+        documents.extend(await self._safe_fetch("teams", self.fetch_teams_messages))
         return documents
+
+    async def _safe_fetch(self, source_name: str, fetch_fn: Any) -> list[CorpusDocument]:
+        try:
+            return await fetch_fn()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            if status in (401, 403):
+                LOGGER.warning(
+                    "Skipping source %s due to permission/auth issue (%s): %s",
+                    source_name,
+                    status,
+                    exc,
+                )
+                return []
+            raise
 
     async def fetch_outlook_messages(self) -> list[CorpusDocument]:
         if not self._settings.m365_user_id:
