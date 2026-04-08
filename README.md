@@ -191,6 +191,18 @@ python scripts/capture_consent_callback.py
 
 This starts a local callback listener (default `http://127.0.0.1:8787/callback`) and automatically submits the captured token to the local consent-check endpoint.
 
+Build onboarding authorize URL from `.env`:
+
+```powershell
+python scripts/build_auth_url.py
+```
+
+Open browser automatically:
+
+```powershell
+python scripts/build_auth_url.py --open
+```
+
 ## Important limitations in this starter
 
 - OneDrive ingestion reads text-like files directly and stores metadata for unsupported binary files.

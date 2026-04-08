@@ -70,6 +70,15 @@
       "problemMatcher": []
     },
     {
+      "label": "Build onboarding auth URL",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "scripts\\build_auth_url.py"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Run Clarion Hosted Agent",
       "type": "shell",
       "command": ".\\.venv\\Scripts\\python.exe",
