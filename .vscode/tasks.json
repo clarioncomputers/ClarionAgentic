@@ -33,6 +33,16 @@
       "problemMatcher": []
     },
     {
+      "label": "Run consent check endpoint",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "scripts\\consent_check_server.py"
+      ],
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
       "label": "Run Clarion Hosted Agent",
       "type": "shell",
       "command": ".\\.venv\\Scripts\\python.exe",

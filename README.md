@@ -137,6 +137,24 @@ The `teams-app/manifest.template.json` file is intentionally a template. You mus
 - Hosted domain
 - Branding values
 
+## Partner Onboarding
+
+For partner distribution and multi-tenant onboarding, use:
+
+- Checklist: `docs/partner-onboarding-checklist.md`
+- Graph preflight: `python scripts/check_graph_access.py`
+- Consent verification endpoint: `python scripts/consent_check_server.py`
+
+The consent endpoint is available at `POST /onboarding/consent/check` and accepts:
+
+```json
+{
+    "access_token": "<jwt-access-token>"
+}
+```
+
+It returns tenant/app identity claims plus missing Graph scopes/roles to help validate admin consent during onboarding.
+
 ## Important limitations in this starter
 
 - OneDrive ingestion reads text-like files directly and stores metadata for unsupported binary files.
