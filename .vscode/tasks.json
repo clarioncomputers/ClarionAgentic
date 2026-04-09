@@ -79,6 +79,15 @@
       "problemMatcher": []
     },
     {
+      "label": "Validate partner onboarding",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": [
+        "scripts\\validate_partner_onboarding.py"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Run Clarion Hosted Agent",
       "type": "shell",
       "command": ".\\.venv\\Scripts\\python.exe",
