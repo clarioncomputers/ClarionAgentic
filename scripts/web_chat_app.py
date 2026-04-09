@@ -5,10 +5,12 @@ import asyncio
 import html
 import json
 import logging
+import os
 import ssl
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from time import perf_counter
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -317,9 +319,13 @@ HTML_PAGE = """<!doctype html>
         return;
       }
 
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Sending...";
+      status.textContent = "Preparing request...";
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
       addMessage("user", prompt);
       promptInput.value = "";
-      sendBtn.disabled = true;
       status.textContent = "Waiting for response...";
       const pending = addMessage("assistant", "Thinking...");
 
@@ -351,6 +357,7 @@ HTML_PAGE = """<!doctype html>
         status.textContent = "Agent unavailable";
       } finally {
         sendBtn.disabled = false;
+        sendBtn.textContent = "Send";
         promptInput.focus();
       }
     });
@@ -372,9 +379,189 @@ HTML_PAGE = """<!doctype html>
 """
 
 
+STATUS_PAGE_HTML = """<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>Clarion Tenant Health</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --line: #dbe4ef;
+      --ink: #0f172a;
+      --ok: #166534;
+      --warn: #92400e;
+      --bad: #991b1b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 1rem;
+      font-family: \"Segoe UI\", \"Trebuchet MS\", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, #e0f2fe, transparent 30%),
+        radial-gradient(circle at 90% 20%, #dcfce7, transparent 28%),
+        var(--bg);
+    }
+    .card {
+      max-width: 920px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card);
+      box-shadow: 0 12px 28px rgba(2, 6, 23, 0.08);
+      overflow: hidden;
+    }
+    header {
+      display: flex;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(120deg, #0f172a, #1e3a8a);
+      color: #f8fafc;
+    }
+    h1 { margin: 0; font-size: 1.05rem; }
+    #overall { font-weight: 700; }
+    main { padding: 1rem 1.2rem; }
+    .meta { font-size: 0.9rem; opacity: 0.8; margin-bottom: 0.9rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      padding: 0.6rem;
+      vertical-align: top;
+      font-size: 0.95rem;
+    }
+    .ok { color: var(--ok); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class=\"card\">
+    <header>
+      <h1>Clarion Tenant Health</h1>
+      <div id=\"overall\">Loading...</div>
+    </header>
+    <main>
+      <div id=\"meta\" class=\"meta\"></div>
+      <table>
+        <thead>
+          <tr><th>Check</th><th>Status</th><th>Detail</th></tr>
+        </thead>
+        <tbody id=\"rows\"></tbody>
+      </table>
+    </main>
+  </div>
+  <script>
+    function statusClass(value) {
+      if (value === \"ok\") return \"ok\";
+      if (value === \"warn\") return \"warn\";
+      return \"bad\";
+    }
+
+    async function refresh() {
+      const response = await fetch('/api/tenant/health', { cache: 'no-store' });
+      const payload = await response.json();
+
+      const overall = document.getElementById('overall');
+      const meta = document.getElementById('meta');
+      const rows = document.getElementById('rows');
+
+      overall.className = statusClass(payload.overall_status === 'healthy' ? 'ok' : payload.overall_status === 'degraded' ? 'warn' : 'bad');
+      overall.textContent = payload.overall_status;
+      meta.textContent = `last_checked_utc: ${payload.last_checked_utc} | tenant: ${payload.tenant_id || 'unknown'}`;
+
+      rows.innerHTML = '';
+      for (const [name, check] of Object.entries(payload.checks || {})) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${name}</td><td class=\"${statusClass(check.status)}\">${check.status}</td><td>${check.detail || ''}</td>`;
+        rows.appendChild(tr);
+      }
+    }
+
+    refresh().catch((error) => {
+      document.getElementById('overall').textContent = `error: ${error}`;
+    });
+    setInterval(() => refresh().catch(() => {}), 10000);
+  </script>
+</body>
+</html>
+"""
+
+
 CHAT_HISTORY: list[tuple[str, str, bool]] = [
     ("assistant", "Chat UI is connected. Send a prompt to the hosted agent.", False),
 ]
+
+
+def _log_telemetry(event_name: str, **fields: object) -> None:
+  payload = {
+    "event": event_name,
+    "timestamp_utc": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+  }
+  payload.update(fields)
+  LOGGER.info("telemetry %s", json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str))
+
+
+def _status(ok: bool, detail: str) -> dict[str, str]:
+  return {"status": "ok" if ok else "fail", "detail": detail}
+
+
+def _warn(detail: str) -> dict[str, str]:
+  return {"status": "warn", "detail": detail}
+
+
+def _collect_tenant_health(agent_base_url: str, tenant_id: str) -> dict[str, object]:
+  checks: dict[str, dict[str, str]] = {}
+
+  corpus_path = Path(__file__).resolve().parents[1] / "data" / "processed" / "m365_corpus.jsonl"
+  if corpus_path.exists():
+    age_minutes = (datetime.now(UTC).timestamp() - corpus_path.stat().st_mtime) / 60.0
+    checks["corpus"] = _status(True, f"available ({corpus_path}, age_minutes={age_minutes:.1f})")
+  else:
+    checks["corpus"] = _status(False, f"missing ({corpus_path})")
+
+  has_project_endpoint = bool(
+    os.getenv("FOUNDRY_PROJECT_ENDPOINT", "").strip()
+    or os.getenv("AZURE_AI_PROJECT_ENDPOINT", "").strip()
+  )
+  has_model_deployment = bool(
+    os.getenv("FOUNDRY_MODEL_DEPLOYMENT_NAME", "").strip()
+    or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "").strip()
+  )
+  missing_env: list[str] = []
+  if not has_project_endpoint:
+    missing_env.append("FOUNDRY_PROJECT_ENDPOINT|AZURE_AI_PROJECT_ENDPOINT")
+  if not has_model_deployment:
+    missing_env.append("FOUNDRY_MODEL_DEPLOYMENT_NAME|AZURE_AI_MODEL_DEPLOYMENT_NAME")
+  if missing_env:
+    checks["foundry_config"] = _status(False, f"missing env vars: {', '.join(missing_env)}")
+  else:
+    checks["foundry_config"] = _status(True, "required env vars present")
+
+  try:
+    probe_payload = {"input": "What is my m365 status?", "stream": False}
+    probe_response = asyncio.run(_call_hosted_agent(agent_base_url, probe_payload, timeout=20.0))
+    checks["hosted_agent"] = _status(True, _extract_assistant_text(probe_response)[:180])
+  except Exception as exc:  # noqa: BLE001
+    checks["hosted_agent"] = _status(False, f"unreachable: {str(exc)[:180]}")
+
+  has_warn = any(item["status"] == "warn" for item in checks.values())
+  has_fail = any(item["status"] == "fail" for item in checks.values())
+  overall_status = "unhealthy" if has_fail else "degraded" if has_warn else "healthy"
+
+  return {
+    "tenant_id": tenant_id,
+    "overall_status": overall_status,
+    "last_checked_utc": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    "checks": checks,
+  }
 
 
 def _extract_assistant_text(payload: dict) -> str:
@@ -473,9 +660,24 @@ class WebChatHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
+        tenant_id = self.headers.get("x-tenant-id", "unknown")
 
         if path in ("/", "/index.html"):
             self._send_html(_render_page())
+            return
+
+        if path == "/status":
+            self._send_html(STATUS_PAGE_HTML)
+            return
+
+        if path == "/api/tenant/health":
+            health_payload = _collect_tenant_health(self.agent_base_url, tenant_id)
+            _log_telemetry(
+                "tenant_health_checked",
+                tenant_id=tenant_id,
+                overall_status=health_payload.get("overall_status"),
+            )
+            self._send_json(health_payload)
             return
 
         if path == "/api/chat":
@@ -500,6 +702,8 @@ class WebChatHandler(BaseHTTPRequestHandler):
         if path not in ("/api/chat", "/chat"):
             self.send_error(404, "Not found")
             return
+
+        tenant_id = self.headers.get("x-tenant-id", "unknown")
 
         content_length = int(self.headers.get("Content-Length", "0"))
         raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
@@ -531,30 +735,56 @@ class WebChatHandler(BaseHTTPRequestHandler):
             "input": prompt,
             "stream": False,
         }
+        request_started = perf_counter()
 
         try:
             response_payload = asyncio.run(_call_hosted_agent(self.agent_base_url, request_payload))
+            latency_ms = int((perf_counter() - request_started) * 1000)
+            _log_telemetry(
+                "chat_request",
+                tenant_id=tenant_id,
+                outcome="ok",
+                latency_ms=latency_ms,
+                prompt_chars=len(prompt),
+            )
             if path == "/chat":
                 CHAT_HISTORY.append(("assistant", _extract_assistant_text(response_payload), False))
                 self._send_html(_render_page())
             else:
                 self._send_json(response_payload)
         except httpx.HTTPStatusError as exc:
+            latency_ms = int((perf_counter() - request_started) * 1000)
             detail = exc.response.text[:800]
             error_payload = {
                 "error": f"Hosted agent returned HTTP {exc.response.status_code}.",
                 "detail": detail,
             }
+            _log_telemetry(
+                "chat_request",
+                tenant_id=tenant_id,
+                outcome="http_error",
+                latency_ms=latency_ms,
+                prompt_chars=len(prompt),
+                status_code=exc.response.status_code,
+            )
             if path == "/chat":
                 CHAT_HISTORY.append(("assistant", f"{error_payload['error']} {detail}", True))
                 self._send_html(_render_page())
             else:
                 self._send_json(error_payload, status_code=502)
         except httpx.HTTPError as exc:
+            latency_ms = int((perf_counter() - request_started) * 1000)
             error_payload = {
                 "error": f"Could not connect to hosted agent at {self.agent_base_url}.",
                 "detail": str(exc),
             }
+            _log_telemetry(
+                "chat_request",
+                tenant_id=tenant_id,
+                outcome="connect_error",
+                latency_ms=latency_ms,
+                prompt_chars=len(prompt),
+            )
             if path == "/chat":
                 CHAT_HISTORY.append(("assistant", f"{error_payload['error']} {error_payload['detail']}", True))
                 self._send_html(_render_page())
@@ -657,8 +887,8 @@ def _run_server(host: str, port: int, agent_url: str, cert_file: str | None = No
         httpd.server_close()
 
 
-async def _call_hosted_agent(agent_base_url: str, payload: dict) -> dict:
-    async with httpx.AsyncClient(timeout=90.0) as client:
+async def _call_hosted_agent(agent_base_url: str, payload: dict, timeout: float = 90.0) -> dict:
+  async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(f"{agent_base_url}/responses", json=payload)
         response.raise_for_status()
         return response.json()

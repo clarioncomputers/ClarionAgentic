@@ -10,3 +10,25 @@ Minimum values you must set:
 - `BOT_APP_ID`
 - `AGENT_HOST_DOMAIN`
 - developer metadata
+
+## Build Manifest And Package
+
+From repo root:
+
+```powershell
+python scripts/package_teams_manifest.py \
+	--teams-app-id "<teams-app-id>" \
+	--bot-app-id "<bot-app-id>" \
+	--agent-host-domain "your-agent-host.example.com"
+```
+
+Outputs:
+
+- `teams-app/dist/manifest.json`
+- `teams-app/dist/clarion-teams-app.zip`
+
+The zip command expects `teams-app/color.png` and `teams-app/outline.png`. If you only want the rendered manifest:
+
+```powershell
+python scripts/package_teams_manifest.py --no-zip
+```

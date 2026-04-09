@@ -96,9 +96,16 @@ python scripts/web_chat_app.py
 
 Then open:
 
-- `http://127.0.0.1:8090`
+- `https://127.0.0.1:8090`
 
 The UI forwards prompts to the hosted agent endpoint (`http://127.0.0.1:8088/responses`) and shows responses in a chat view.
+
+The script uses a local self-signed certificate for HTTPS and auto-generates `scripts/webchat.crt` and `scripts/webchat.key` if missing.
+
+Partner health status page:
+
+- `https://127.0.0.1:8090/status`
+- JSON API: `GET /api/tenant/health`
 
 You can also start it from VS Code tasks with `Run Clarion Web Chat`.
 
@@ -218,6 +225,42 @@ Open browser automatically:
 ```powershell
 python scripts/build_auth_url.py --open
 ```
+
+Run consolidated onboarding validation:
+
+```powershell
+python scripts/validate_partner_onboarding.py
+```
+
+With consent token and JSON output:
+
+```powershell
+python scripts/validate_partner_onboarding.py --token "<tenant-access-token>" --json
+```
+
+## Teams Packaging Helper
+
+Render and package a Teams manifest from template values:
+
+```powershell
+python scripts/package_teams_manifest.py \
+    --teams-app-id "<teams-app-id>" \
+    --bot-app-id "<bot-app-id>" \
+    --agent-host-domain "your-agent-host.example.com"
+```
+
+This writes:
+
+- `teams-app/dist/manifest.json`
+- `teams-app/dist/clarion-teams-app.zip` (if icon files exist)
+
+You can use environment variables instead of arguments: `TEAMS_APP_ID`, `BOT_APP_ID`, `AGENT_HOST_DOMAIN`.
+
+## Telemetry Schema
+
+Tenant-level telemetry events are documented in:
+
+- `docs/tenant-telemetry-schema.md`
 
 ## Important limitations in this starter
 

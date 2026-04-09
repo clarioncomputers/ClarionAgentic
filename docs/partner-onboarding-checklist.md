@@ -30,6 +30,7 @@ Grant admin consent in the customer tenant before enabling ingestion jobs.
 
 - Run `python scripts/check_graph_access.py` after loading tenant configuration.
 - Run `python scripts/consent_check_server.py` and verify consent claims from onboarding tokens.
+- Run `python scripts/validate_partner_onboarding.py` for a consolidated readiness report.
 - Confirm `teams`, `onedrive`, and `outlook` checks return expected status.
 
 ## 5. Operational Readiness
