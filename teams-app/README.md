@@ -32,3 +32,11 @@ The zip command expects `teams-app/color.png` and `teams-app/outline.png`. If yo
 ```powershell
 python scripts/package_teams_manifest.py --no-zip
 ```
+
+## Deploy And Use In Teams
+
+1. Upload `teams-app/dist/clarion-teams-app.zip` to the Teams admin center.
+2. Assign an app setup policy to pilot users/teams.
+3. Ask pilot users to start in personal scope first, then team/group chat.
+4. Validate first prompt behavior with `What is my m365 status?`.
+5. If issues occur, check runtime health via `https://127.0.0.1:8090/status`.

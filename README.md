@@ -256,6 +256,90 @@ This writes:
 
 You can use environment variables instead of arguments: `TEAMS_APP_ID`, `BOT_APP_ID`, `AGENT_HOST_DOMAIN`.
 
+## Teams User Runbook
+
+Use this section to guide partner admins and end users from packaging to daily usage.
+
+### Admin Setup (Partner Or Customer Tenant)
+
+1. Confirm onboarding readiness:
+
+```powershell
+python scripts/validate_partner_onboarding.py
+```
+
+2. Build the Teams package:
+
+```powershell
+python scripts/package_teams_manifest.py \
+    --teams-app-id "<teams-app-id>" \
+    --bot-app-id "<bot-app-id>" \
+    --agent-host-domain "your-agent-host.example.com"
+```
+
+3. Verify the package exists:
+
+- `teams-app/dist/clarion-teams-app.zip`
+
+4. Upload the package to Teams:
+
+- Teams admin center: Teams apps > Manage apps > Upload
+- Or from Teams client: Apps > Manage your apps > Upload a custom app
+
+5. Assign availability policy:
+
+- Pin for pilot users
+- Add to selected teams
+- Keep broad rollout disabled until pilot sign-off
+
+### End User Experience In Teams
+
+After installation, users can open the app in:
+
+- Personal scope
+- Team scope
+- Group chat scope
+
+Typical first-use prompts:
+
+- `What is my m365 status?`
+- `Summarize recent Outlook messages about project status.`
+- `What changed in Teams channel updates this week?`
+
+Manifest command examples already exposed in Teams:
+
+- `query-m365`
+- `refresh-corpus`
+
+### Support Runbook (L1/L2)
+
+1. If users report no responses:
+
+- Check app status page: `https://127.0.0.1:8090/status`
+- Check health JSON: `GET /api/tenant/health`
+
+2. If consent or permissions fail:
+
+- Run `python scripts/validate_partner_onboarding.py --json`
+- If needed, validate token claims with `scripts/consent_check_server.py`
+
+3. If answers are stale:
+
+- Re-run ingestion: `python scripts/ingest_m365.py`
+- Re-test user prompt
+
+4. If Teams package errors occur:
+
+- Re-render manifest with `scripts/package_teams_manifest.py`
+- Verify icon files and manifest placeholders were resolved
+
+### Pilot Success Criteria
+
+- 90%+ successful responses for pilot prompt set
+- Median response time within expected target for tenant
+- No missing critical Graph consent/role requirements
+- Tenant health endpoint remains healthy or degraded (not unhealthy)
+
 ## Telemetry Schema
 
 Tenant-level telemetry events are documented in:
