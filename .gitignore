@@ -12,3 +12,5 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+scripts/webchat.crt
+scripts/webchat.key

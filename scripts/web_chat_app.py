@@ -5,10 +5,24 @@ import asyncio
 import html
 import json
 import logging
+import ssl
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
+
+try:
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+    HAS_CRYPTOGRAPHY = True
+except ImportError:
+    HAS_CRYPTOGRAPHY = False
 
 LOGGER = logging.getLogger(__name__)
 
@@ -237,24 +251,54 @@ HTML_PAGE = """<!doctype html>
     });
 
     function extractAssistantText(payload) {
-      if (!payload || !Array.isArray(payload.output)) {
-        if (payload && payload.error) {
-          return `Error: ${payload.error}`;
-        }
+      if (!payload || typeof payload !== "object") {
         return "No output returned by hosted agent.";
       }
 
+      if (payload.error) {
+        return `Error: ${payload.error}`;
+      }
+
+      // Some runtime errors return { code, message } without an output array.
+      if (payload.message && payload.code) {
+        return `${payload.code}: ${payload.message}`;
+      }
+
+      if (payload.message && !Array.isArray(payload.output)) {
+        return String(payload.message);
+      }
+
       const chunks = [];
+      if (!Array.isArray(payload.output)) {
+        return `No text output returned by hosted agent. Raw status: ${payload.status || "unknown"}`;
+      }
+
       for (const item of payload.output) {
-        if (!item || !Array.isArray(item.content)) {
-          if (item && item.type === "function_call_output" && item.output) {
-            chunks.push(String(item.output));
-          }
+        if (!item || typeof item !== "object") {
           continue;
         }
+
+        if (item.type === "function_call_output" && item.output) {
+          chunks.push(String(item.output));
+        }
+
+        if (!Array.isArray(item.content)) {
+          continue;
+        }
+
         for (const contentItem of item.content) {
-          if (contentItem && contentItem.type === "output_text" && contentItem.text) {
-            chunks.push(contentItem.text);
+          if (!contentItem || typeof contentItem !== "object") {
+            continue;
+          }
+
+          if (contentItem.type === "output_text" && contentItem.text) {
+            chunks.push(String(contentItem.text));
+          } else if (contentItem.type === "text") {
+            if (typeof contentItem.text === "string") {
+              chunks.push(contentItem.text);
+            } else if (contentItem.text && typeof contentItem.text === "object" && contentItem.text.value) {
+              chunks.push(String(contentItem.text.value));
+            }
           }
         }
       }
@@ -263,11 +307,7 @@ HTML_PAGE = """<!doctype html>
         return chunks.join("\n");
       }
 
-      try {
-        return `No text output returned by hosted agent. Raw status: ${payload.status || "unknown"}`;
-      } catch {
-        return "No text output returned by hosted agent.";
-      }
+      return `No text output returned by hosted agent. Raw status: ${payload.status || "unknown"}`;
     }
 
     form.addEventListener("submit", async (event) => {
@@ -338,27 +378,53 @@ CHAT_HISTORY: list[tuple[str, str, bool]] = [
 
 
 def _extract_assistant_text(payload: dict) -> str:
-    output = payload.get("output", [])
-    chunks: list[str] = []
+  if not isinstance(payload, dict):
+    return "No output returned by hosted agent."
 
-    for item in output:
-        if not isinstance(item, dict):
-            continue
-        content = item.get("content")
-        if isinstance(content, list):
-            for content_item in content:
-                if (
-                    isinstance(content_item, dict)
-                    and content_item.get("type") == "output_text"
-                    and content_item.get("text")
-                ):
-                    chunks.append(str(content_item["text"]))
-        elif item.get("type") == "function_call_output" and item.get("output"):
-            chunks.append(str(item["output"]))
+  if payload.get("error"):
+    return f"Error: {payload['error']}"
 
-    if chunks:
-        return "\n".join(chunks)
+  if payload.get("code") and payload.get("message"):
+    return f"{payload['code']}: {payload['message']}"
+
+  if payload.get("message") and not isinstance(payload.get("output"), list):
+    return str(payload["message"])
+
+  output = payload.get("output", [])
+  chunks: list[str] = []
+
+  if not isinstance(output, list):
     return f"No text output returned by hosted agent. Raw status: {payload.get('status', 'unknown')}"
+
+  for item in output:
+    if not isinstance(item, dict):
+      continue
+
+    if item.get("type") == "function_call_output" and item.get("output"):
+      chunks.append(str(item["output"]))
+
+    content = item.get("content")
+    if not isinstance(content, list):
+      continue
+
+    for content_item in content:
+      if not isinstance(content_item, dict):
+        continue
+
+      if content_item.get("type") == "output_text" and content_item.get("text"):
+        chunks.append(str(content_item["text"]))
+        continue
+
+      if content_item.get("type") == "text":
+        text_value = content_item.get("text")
+        if isinstance(text_value, str) and text_value:
+          chunks.append(text_value)
+        elif isinstance(text_value, dict) and text_value.get("value"):
+          chunks.append(str(text_value["value"]))
+
+  if chunks:
+    return "\n".join(chunks)
+  return f"No text output returned by hosted agent. Raw status: {payload.get('status', 'unknown')}"
 
 
 def _render_history() -> str:
@@ -496,11 +562,93 @@ class WebChatHandler(BaseHTTPRequestHandler):
                 self._send_json(error_payload, status_code=502)
 
 
-def _run_server(host: str, port: int, agent_url: str) -> None:
+def _generate_self_signed_cert(cert_file: str, key_file: str) -> None:
+    """Generate a self-signed certificate using cryptography library."""
+    if not HAS_CRYPTOGRAPHY:
+        raise ImportError(
+            "cryptography library required for HTTPS cert generation. "
+            "Install with: pip install cryptography"
+        )
+    
+    # Generate private key
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend(),
+    )
+    
+    # Create certificate
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Local"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "Local"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Clarion"),
+            x509.NameAttribute(NameOID.COMMON_NAME, "localhost"),
+        ]
+    )
+    
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow())
+        .not_valid_after(datetime.utcnow() + timedelta(days=365))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.DNSName("localhost"), x509.DNSName("127.0.0.1")]),
+            critical=False,
+        )
+        .sign(private_key, hashes.SHA256(), default_backend())
+    )
+    
+    # Write certificate to file
+    with open(cert_file, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+    
+    # Write private key to file
+    with open(key_file, "wb") as f:
+        f.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
+
+
+def _run_server(host: str, port: int, agent_url: str, cert_file: str | None = None, key_file: str | None = None) -> None:
     WebChatHandler.agent_base_url = agent_url.rstrip("/")
+    
+    # Default paths for self-signed cert in script directory
+    script_dir = Path(__file__).parent
+    if cert_file is None:
+        cert_file = str(script_dir / "webchat.crt")
+    if key_file is None:
+        key_file = str(script_dir / "webchat.key")
+    
+    # Generate self-signed certificate if missing
+    cert_path = Path(cert_file)
+    key_path = Path(key_file)
+    if not cert_path.exists() or not key_path.exists():
+        LOGGER.info("Generating self-signed certificate for HTTPS...")
+        try:
+            _generate_self_signed_cert(cert_file, key_file)
+            LOGGER.info("Self-signed certificate generated at %s and %s", cert_file, key_file)
+        except (ImportError, Exception) as e:
+            LOGGER.error("Failed to generate self-signed certificate: %s", e)
+            raise
+    
+    # Create HTTPS server with SSL context
     httpd = ThreadingHTTPServer((host, port), WebChatHandler)
-    LOGGER.info("Clarion web chat running at http://%s:%s", host, port)
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context.load_cert_chain(cert_file, key_file)
+    httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+    
+    LOGGER.info("Clarion web chat running at https://%s:%s", host, port)
     LOGGER.info("Proxying requests to hosted agent endpoint at %s/responses", WebChatHandler.agent_base_url)
+    LOGGER.warning("Self-signed certificate; browser will show security warning (expected for localhost).")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -525,10 +673,20 @@ def main() -> None:
         default="http://127.0.0.1:8088",
         help="Hosted agent base URL (default: http://127.0.0.1:8088)",
     )
+    parser.add_argument(
+        "--cert",
+        default=None,
+        help="Path to SSL certificate file (default: webchat.crt in script directory)",
+    )
+    parser.add_argument(
+        "--key",
+        default=None,
+        help="Path to SSL key file (default: webchat.key in script directory)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    _run_server(args.host, args.port, args.agent_url)
+    _run_server(args.host, args.port, args.agent_url, args.cert, args.key)
 
 
 if __name__ == "__main__":
